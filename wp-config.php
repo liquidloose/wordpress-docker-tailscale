@@ -110,6 +110,19 @@ define('WP_DEBUG', !!getenv_docker('WORDPRESS_DEBUG', ''));
 
 /* Add any custom values between this line and the "stop editing" line. */
 
+// Public site URL from WORDPRESS_PUBLIC_URL (Compose defaults to https://$TAILSCALE_MAGICDNS_HOSTNAME.$TAILNET_DNS_SUFFIX unless you set WORDPRESS_PUBLIC_URL= empty for localhost-only).
+$wordpress_public_url = trim((string) getenv_docker('WORDPRESS_PUBLIC_URL', ''));
+if ($wordpress_public_url !== '') {
+	$wordpress_public_url = rtrim($wordpress_public_url, '/');
+	define('WP_HOME', $wordpress_public_url);
+	define('WP_SITEURL', $wordpress_public_url);
+	// Optional: set WORDPRESS_FORCE_SSL_ADMIN=1 in the wordpress service env when you only use https://… for admin.
+	// Leaving it unset avoids broken logins over http://localhost when the site URL is https MagicDNS.
+	if (!!getenv_docker('WORDPRESS_FORCE_SSL_ADMIN', '')) {
+		define('FORCE_SSL_ADMIN', true);
+	}
+}
+
 // If we're behind a proxy server and using HTTPS, we need to alert WordPress of that fact
 // see also https://wordpress.org/support/article/administration-over-ssl/#using-a-reverse-proxy
 
@@ -117,6 +130,17 @@ if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strpos($_SERVER['HTTP_X_FORWARD
 	$_SERVER['HTTPS'] = 'on';
 }
 // (we include this by default because reverse proxying is extremely common in container environments)
+
+// Serve terminates TLS on :443; :80 is still Apache. Requests to http://*.ts.net never hit Serve, so send them to https:// on the same host (localhost / non-.ts.net unchanged).
+if (PHP_SAPI !== 'cli' && !empty($_SERVER['HTTP_HOST']) && strpos($_SERVER['HTTP_HOST'], '.ts.net') !== false) {
+	$forwarded_https = isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strpos((string) $_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false;
+	$apache_https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+	if (!$forwarded_https && !$apache_https) {
+		$path = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/';
+		header('Location: https://' . $_SERVER['HTTP_HOST'] . $path, true, 301);
+		exit;
+	}
+}
 
 if ($configExtra = getenv_docker('WORDPRESS_CONFIG_EXTRA', '')) {
 	eval($configExtra);
