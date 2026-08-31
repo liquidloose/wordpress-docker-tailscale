@@ -14,9 +14,9 @@ Self-hosted WordPress in Docker, reachable on the tailnet with **HTTPS** and **M
 ## Docker Compose techniques
 
 - **Ports**: Publish `${WEB_PORT}:80` on the **Tailscale** service (not WordPress), because only the namespace owner can publish ports when using `network_mode: service:…`.
-- **`extra_hosts`**: Cannot be set on WordPress when it uses `network_mode: service:tailscale` (Docker error: conflicting options). Move `extra_hosts` to the **Tailscale** service so `/etc/hosts` applies to the shared netns.
+- **Do not use `extra_hosts` for WordPress.org.** This stack reaches the internet via Tailscale; `api.wordpress.org` and `downloads.wordpress.org` must resolve through normal DNS. Static IPs go stale and break plugin installs. WordPress cannot set `extra_hosts` when it uses `network_mode: service:tailscale` (Docker: conflicting options) — do not move those pins onto the Tailscale service either.
 - **Image pin**: `ghcr.io/tailscale/tailscale:v1.78.3+` — **v1.78.1** panics with `TS_SERVE_CONFIG` off-Kubernetes (`kubeClient` nil deref); fixed in **v1.78.3** (see tailscale/tailscale#14354).
-- **`TS_USERSPACE: "false"`** with `/dev/net/tun` + `NET_ADMIN` / `SYS_MODULE` — default userspace networking can be awkward with Serve → loopback; kernel tun is more reliable per Tailscale Docker docs.
+- **`TS_USERSPACE: ${TS_USERSPACE:-true}`** with `NET_ADMIN` only. Unprivileged LXC hosts have no `/dev/net/tun`, so do not mount that device or add `SYS_MODULE`. Kernel TUN is optional: set `TS_USERSPACE=false` and mount `/dev/net/tun` only if the host actually provides it.
 
 ## Serve config (`TS_SERVE_CONFIG`)
 

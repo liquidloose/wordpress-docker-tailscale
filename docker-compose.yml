@@ -16,26 +16,21 @@ services:
     # v1.78.1 panics on Docker when TS_SERVE_CONFIG is set (nil kubeClient); fixed in v1.78.3. See tailscale/tailscale#14354.
     image: ghcr.io/tailscale/tailscale:v1.78.3
     hostname: ${TAILSCALE_MAGICDNS_HOSTNAME}
-    extra_hosts:
-      - "api.wordpress.org:198.143.164.251"
-      - "downloads.wordpress.org:198.143.164.250"
     ports:
       - "${WEB_PORT}:80"
     environment:
       TS_AUTHKEY: ${TS_AUTHKEY}
       TS_STATE_DIR: /var/lib/tailscale
       TS_SERVE_CONFIG: /config/serve.json
-      # Default is userspace networking; Serve → 127.0.0.1:80 is more reliable with kernel tun (we already mount /dev/net/tun).
-      TS_USERSPACE: "false"
+      # Userspace networking: no /dev/net/tun (unprivileged LXC cannot create it).
+      # Kernel TUN is more reliable for Serve; only set TS_USERSPACE=false if the host provides /dev/net/tun.
+      TS_USERSPACE: ${TS_USERSPACE:-true}
       TS_EXTRA_ARGS: ${TS_EXTRA_ARGS:-}
     volumes:
       - tailscale_state:/var/lib/tailscale
       - ./tailscale/serve:/config
-    devices:
-      - /dev/net/tun:/dev/net/tun
     cap_add:
       - NET_ADMIN
-      - SYS_MODULE
     restart: unless-stopped
 
   wordpress:
@@ -73,10 +68,6 @@ services:
     profiles:
       - wpcli
     # Match wordpress:cli defaults so wp can read core + write plugins (uid 1000 often breaks wp core is-installed / installs on bind-mounted wp-content).
-    extra_hosts:
-      # Same static hosts as tailscale service so wp plugin install can reach wordpress.org if DNS is flaky.
-      - "api.wordpress.org:198.143.164.251"
-      - "downloads.wordpress.org:198.143.164.250"
     depends_on:
       - wordpress
       - db
