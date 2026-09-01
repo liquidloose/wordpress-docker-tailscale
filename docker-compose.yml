@@ -60,6 +60,35 @@ services:
         source: "./wp-config.php"
         target: "/var/www/html/wp-config.php"
 
+  # One-shot: after core is installed, install/activate slugs from bin/wp-plugins.txt, then exit.
+  # Re-runs on later `compose up` (exited containers are started again); install is idempotent.
+  wordpress-bootstrap:
+    image: wordpress:cli
+    depends_on:
+      - wordpress
+      - db
+    restart: "no"
+    volumes_from:
+      - wordpress
+    links:
+      - db:mysql
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - type: bind
+        source: "./bin/wpcli-entrypoint.sh"
+        target: "/bin/wpcli-entrypoint.sh"
+        read_only: true
+      - type: bind
+        source: "./bin/wp-plugins.txt"
+        target: "/bin/wp-plugins.txt"
+        read_only: true
+    entrypoint: ["/bin/sh", "/bin/wpcli-entrypoint.sh"]
+    command: ["wp", "plugin", "list", "--status=active"]
+
   my-wpcli:
     image: wordpress:cli
     # Not part of default `docker compose up` — avoids a second always-on CLI beside `compose run` one-offs.

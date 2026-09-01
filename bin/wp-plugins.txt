@@ -1,10 +1,9 @@
-# One WordPress.org plugin slug per line. Installed/activated on each my-wpcli container start (idempotent).
-# Lines starting with # and blank lines are ignored.
-#
-# Uncomment slugs below (one per line). Commented lines are ignored.
+# One WordPress.org plugin slug per line. Installed/activated on wordpress-bootstrap
+# (default compose up) and my-wpcli start. Lines starting with # and blanks are ignored.
 query-monitor
 create-block-theme
 google-site-kit
 prime-mover
 rank-math
 search-with-typesense
+kadence-blocks
